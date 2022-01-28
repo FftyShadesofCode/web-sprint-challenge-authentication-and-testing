@@ -1,46 +1,40 @@
-const User = require("../users/users-model");
-
-const checkUsernameFree = async (req, res, next) => {
-    try {
-        const {username} = req.body
-        const [existing_user] = await User.findBy({username})
-        if (!existing_user) {
-            next()
-        } else {
-            next({status: 422, message: 'username taken'})
-        }
-    } catch (err) {
-        next(err)
-    }
-}
-
-async function checkUsernameExists(req, res, next) {
-    try {
-        const {username} = req.body
-        const [exist_user] = await User.findBy({username})
-        if (!exist_user) {
-            next({status: 401, message: `invalid credentials`})
-        } else {
-            req.user = exist_user;
-            next()
-        }
-    } catch (err) {
-        next(err)
-    }
-}
-
-const notEmpty = (req, res, next) => {
-    const {username, password} = req.body
-    if (!username || !password || username.trim().length < 1 || password.trim().length < 1 || typeof username !== 'string' || typeof password !== 'string') {
-        next({status: 422, message: 'username and password required'})
-    } else {
-        next()
-    }
-}
-
+const {find} = require("../models/users-model");
+const jwt = require("jsonwebtoken");
+const {JWT_SECRET} = require("../../config");
 
 module.exports = {
-    checkUsernameFree,
-    notEmpty,
-    checkUsernameExists
+    userDoesNotExistAlready,
+    reqBodyHasUsernameAndPassword,
+    userDoesExist,
+    tokenBuilder,
+};
+
+async function userDoesNotExistAlready(req, res, next) {
+    const {username} = req.body;
+    const error = {message: "username taken", status: 422};
+    const user = await find(username);
+    !user.length ? next() : next(error);
+}
+
+function reqBodyHasUsernameAndPassword(req, res, next) {
+    const {username, password} = req.body;
+    const error = {message: "username and password required"};
+    username && password ? next() : next(error);
+}
+
+async function userDoesExist(req, res, next) {
+    const {username} = req.body;
+    const error = {message: "invalid credentials", status: 401};
+    const user = await find(username);
+    if (!user.length) {
+        return next(error);
+    }
+    req.user = user[0];
+    next();
+}
+
+function tokenBuilder(user) {
+    const options = {expiresIn: "1d"};
+    const payload = {subject: user.id, username: user.username};
+    return jwt.sign(payload, JWT_SECRET, options);
 }
