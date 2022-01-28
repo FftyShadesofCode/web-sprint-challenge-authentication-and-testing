@@ -1,23 +1,4 @@
-const jwt = require('jsonwebtoken')
-const {JWT_SECRET} = require('../auth/auth-secrets')
-
 module.exports = (req, res, next) => {
-
-  console.log(req.headers)
-  if (!req.headers.authorization) {
-    next({status: 401, message: 'token required'})
-
-  }
-  const token = req.headers.authorization.slice(7) //for postman auth using Bearer token
-  jwt.verify(token, JWT_SECRET, (err, decoded) => {
-    if (err) {
-      return next({status: 404, message: 'token invalid'})
-    } else {
-      req.decoded = decoded
-      next()
-    }
-  })
-
   next();
   /*
     IMPLEMENT
