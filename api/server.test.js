@@ -1,67 +1,113 @@
-const request = require("supertest");
-const db = require("../data/dbConfig");
-const server = require("./server");
-const {find, add, findById} = require("./models/users-model");
+// Write your tests here
+const request = require('supertest')
+const server = require('./server')
+const db = require('../data/dbConfig')
+const {createToken} = require('./auth/auth-model')
 
-const user = {username: "bo_peep", password: 1};
-
-beforeAll(async () => {
-    await db.migrate.rollback();
-    await db.migrate.latest();
-});
-beforeEach(async () => {
-    await db("users").truncate();
-});
-afterAll(async () => {
-    await db.destroy();
-});
-
-test("sanity", () => {
-    expect(undefined).toBe();
-});
-
-test("correct env", () => {
-    expect(process.env.NODE_ENV).toBe('testing')
-});
-
-describe("Unit testing", () => {
-    test("able to add user", async () => {
-        await add(user);
-        expect(find(user)).toBeTruthy()
-    })
-    test("able find user by id", async () => {
-        await add(user);
-        expect(findById(1)).not.toBe()
-    })
+test('sanity', () => {
+    expect(true).toBe(true)
 })
 
+beforeAll(async () => {
+    await db.migrate.rollback()
+    await db.migrate.latest()
+})
+afterAll(async () => {
+    await db.destroy()
+})
 
-describe("[POST] /register", () => {
-    test("successful register", async () => {
-        const res = await request(server)
-            .post("/api/auth/register")
-            .send(user)
-        expect(res.body).toBeTruthy()
-    })
-    test("registered user isn't undefined", async () => {
-        const res = await request(server)
-            .post("/api/auth/register")
-            .send(user)
-        expect(res.body).not.toBe()
-    })
-});
+describe('server.js', () => {
+    describe('[POST] /api/auth/register', () => {
+        it(`[1] responds with correct message on valid register of user`, async () => {
 
-describe("[POST] /login", () => {
-    test("successful login", async () => {
-        const res = await request(server)
-            .post("/api/auth/login")
-            .send(user)
-        expect(res.body).toBeTruthy()
+            const res = await request(server).post('/api/auth/register')
+                .send({username: 'waylay', password: '70K/Y'})
+            expect(res.body.message.username).toMatch(/waylay/i)
+
+        })
+        it(`[2] will reject with correct message, a user register with no name`, async () => {
+
+            const res = await request(server).post('/api/auth/register')
+                .send({username: '', password: '70K/Y'})
+            expect(res.body.message).toMatch(/username and password required/i)
+
+        })
+        it(`[3] will reject with correct message, a user register with no password`, async () => {
+
+            const res = await request(server).post('/api/auth/register')
+                .send({username: 'waylay', password: ''})
+            expect(res.body.message).toMatch(/username and password required/i)
+
+        })
+        it(`[4] will reject with correct message, a username that already exists`, async () => {
+
+            await request(server).post('/api/auth/register')
+                .send({username: 'waylay', password: '123'})
+            const res = await request(server).post('/api/auth/register')
+
+                .send({username: 'waylay', password: '12345'})
+            expect(res.body.message).toMatch(/username taken/i)
+
+        })
+        it(`[5] can succesfully ad user to DB`, async () => {
+
+            const checkBase = await db('users').where('username', 'waylay').first()
+            expect(checkBase).toMatchObject({username: 'waylay'})
+
+        })
     })
-    test("login doesn't not work", async () => {
-        const res = await request(server)
-            .post("/api/auth/login")
-            .send(user)
-        expect(res.body).not.toBe()
+    describe('[POST] /api/auth/login', () => {
+        it(`[1] will reject login with correct message if username does not exist`, async () => {
+
+            const res = await request(server).post('/api/auth/login')
+                .send({username: 'bobby', password: '1234'})
+
+            expect(res.body.message).toMatch(/invalid credentials/i)
+        })
+        it(`[2] will reject login with correct message if username is left blank`, async () => {
+
+            const res = await request(server).post('/api/auth/login')
+                .send({username: '', password: '1234'})
+
+            expect(res.body.message).toMatch(/username and password required/i)
+        })
+        it(`[3] will reject login with correct message if password is left blank`, async () => {
+
+            const res = await request(server).post('/api/auth/login')
+                .send({username: 'waylay', password: ''})
+
+            expect(res.body.message).toMatch(/username and password required/i)
+        })
+        it(`[4] will reject login with correct message if user exists and password is wrong`, async () => {
+
+            await request(server).post('/api/auth/register')
+                .send({username: 'waylay', password: '12345'})
+
+
+            const res = await request(server).post('/api/auth/login')
+                .send({username: 'waylay', password: '1234'})
+
+            expect(res.body.message).toMatch(/invalid credentials/i)
+        })
     })
-});
+    describe('[GET] /api/jokes', () => {
+        it(`[1] will NOT GET data from api without auth, and responds with correct message`, async () => {
+
+            const res = await request(server).get('/api/jokes')
+            expect(res.body.message).toMatch(/token required/i)
+        })
+        it(`[2] will GET data from api with auth`, async () => {
+
+            let token
+            await request(server).post('/api/auth/register')
+                .send({username: 'chip', password: '12345'})
+            await request(server).post('/api/auth/login')
+                .send({username: 'chip', password: '12345'})
+                .then((res) => token = res.body.token)
+
+
+            const res = await request(server).get('/api/jokes').set('authorization', 'Bearer ' + token)
+            expect(res.status).toBe(200)
+        })
+    })
+})
