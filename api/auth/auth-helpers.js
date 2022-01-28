@@ -1,11 +1,10 @@
 const jwt = require('jsonwebtoken')
-const {JWT_SECRET} = require('./secrets')
+const {JWT_SECRET} = require('../secrets/index')
 
 function tokenBuilder(user) {
     const payload = {
         subject: user.id,
         username: user.username,
-        password: user.password,
     }
     const options = {
         expiresIn: '1d'
@@ -14,6 +13,5 @@ function tokenBuilder(user) {
     return result
 }
 
-module.exports = {
-    tokenBuilder
-}
+
+module.exports = tokenBuilder
