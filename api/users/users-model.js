@@ -1,34 +1,27 @@
-const db = require('../../data/dbConfig');
+const db = require("../../data/dbConfig.js");
 
-// not exactly necessary for this project, but it's good to have a look at for my own purposes
-function getAll() {
-    return db('users');
-}
-
-// this will get the user for appropriate login ?
-function getById(id) {
-    return db('users')
-        .where({id})
-        .first();
-}
-
-// honestly i think a filter would be more useful so lets build it
 function findBy(filter) {
-    return db('users')
-        .select('id', 'username')
-        .where(filter);
-    // .first();
+    return db("users").where(filter);
 }
 
-async function insert(user) {
-    const [id] = await db('users').insert(user);
+function findById(id) {
+    return db("users").where("id", id).first();
+}
 
-    return getById(id);
+async function add({username, password}) {
+    let created_id;
+    await db.transaction(async (trx) => {
+        const [id] = await trx("users").insert({
+            username,
+            password,
+        });
+        created_id = id;
+    });
+    return findById(created_id);
 }
 
 module.exports = {
-    getAll,
-    getById,
-    insert,
-    findBy
+    add,
+    findBy,
+    findById,
 };
